@@ -10,8 +10,8 @@ APP=build/TempBar.app
 rm -rf build; mkdir -p "$APP/Contents/MacOS"
 
 if [[ "$1" == "--universal" ]]; then
-  swiftc -O -target x86_64-apple-macos11 TempBar.swift -o build/TempBar-x86_64
-  swiftc -O -target arm64-apple-macos11 TempBar.swift -o build/TempBar-arm64
+  swiftc -O -target x86_64-apple-macos12 TempBar.swift -o build/TempBar-x86_64
+  swiftc -O -target arm64-apple-macos12 TempBar.swift -o build/TempBar-arm64
   lipo -create build/TempBar-x86_64 build/TempBar-arm64 -output "$APP/Contents/MacOS/TempBar"
   rm build/TempBar-x86_64 build/TempBar-arm64
 else
@@ -27,7 +27,7 @@ cat > "$APP/Contents/Info.plist" <<PL
   <key>CFBundleExecutable</key><string>TempBar</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
-  <key>LSMinimumSystemVersion</key><string>11.0</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>LSUIElement</key><true/>
 </dict></plist>
 PL

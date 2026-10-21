@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/Atomphat/tempbar/main/install.sh | 
 | Intel Mac (มี/ไม่มี Touch Bar) | ✅ ทดสอบแล้วบน MacBook Pro 2018 |
 | Apple Silicon (M1/M2…) | ⚠️ ใส่ sensor key ไว้แล้ว แต่ยังไม่ได้ทดสอบ ถ้าขึ้น `--` แจ้งใน Issues ได้ |
 
-ต้องใช้ macOS 11 ขึ้นไป ส่วน Touch Bar ใช้ API ภายในของ Apple (แบบเดียวกับ MTMR / Pock) ถ้าอัปเดต macOS แล้วอาจใช้ไม่ได้
+ต้องใช้ macOS 12 (Monterey) ขึ้นไป ส่วน Touch Bar ใช้ API ภายในของ Apple (แบบเดียวกับ MTMR / Pock) ถ้าอัปเดต macOS แล้วอาจใช้ไม่ได้
 
 ## Build เอง
 
