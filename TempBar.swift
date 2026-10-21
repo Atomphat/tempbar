@@ -46,6 +46,15 @@ final class SMC {
         return (r == kIOReturnSuccess && output.result == 0) ? output : nil
     }
 
+    // ชนิดข้อมูลและขนาดของ key (เช่น "flt ", 4)
+    func info(_ key: String) -> (type: String, size: Int)? {
+        var input = SMCParam()
+        input.key = fourCC(key)
+        input.data8 = 9
+        guard let out = call(&input), out.keyInfo.dataSize > 0 else { return nil }
+        return (fourCCString(out.keyInfo.dataType), Int(out.keyInfo.dataSize))
+    }
+
     func read(_ key: String) -> Double? {
         var input = SMCParam()
         input.key = fourCC(key)
@@ -343,6 +352,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         // .common ให้ยังอัปเดตตอนเปิดเมนูค้างไว้
         let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
         RunLoop.main.add(timer, forMode: .common)
+
+        // ใช้ตอนอัดภาพ README: สั่งเปิด/ปิดเมนูและหน้ารายละเอียด Touch Bar จากภายนอก
+        let dnc = DistributedNotificationCenter.default()
+        let demo: [(String, (AppDelegate) -> Void)] = [
+            ("menu", { $0.statusItem.button?.performClick(nil) }),
+            ("close", { $0.statusItem.menu?.cancelTracking() }),
+            ("touchbar", { $0.showDetail() }),
+        ]
+        for (name, action) in demo {
+            dnc.addObserver(forName: .init("com.atom.tempbar.demo.\(name)"), object: nil, queue: .main) { [weak self] _ in
+                if let self { action(self) }
+            }
+        }
     }
 
     func setupMenuBar() {
@@ -453,9 +475,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         let totalGB = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
         menuUsage.title = "RAM: \(pct(r.ramUsage)) ของ \(Int(totalGB.rounded())) GB"
 
-        // Touch Bar control strip: "🌡62° 23%" สีตามความร้อน
-        trayButton.attributedTitle = NSAttributedString(string: "🌡\(fmt(r.cpu)) \(pct(r.cpuUsage))", attributes: [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .semibold),
+        // Touch Bar control strip: "62°" สีตามความร้อน (ช่องแคบ ใส่ได้แค่นี้)
+        trayButton.attributedTitle = NSAttributedString(string: fmt(r.cpu), attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 16, weight: .semibold),
             .foregroundColor: color(for: r.cpu),
         ])
         usageLabel.stringValue = "⚙︎ \(pct(r.cpuUsage))  ▦ RAM \(pct(r.ramUsage))"
@@ -477,8 +499,9 @@ if CommandLine.arguments.contains("--dump") {
     // debug: แสดงค่าที่อ่านได้แล้วจบ
     guard let smc = SMC() else { print("open SMC failed"); exit(1) }
     print("struct stride:", MemoryLayout<SMCParam>.stride)
-    for k in cpuKeys + gpuKeys + ["TC1C", "TC2C", "TC3C", "TC4C", "FNum", "F0Ac", "F1Ac"] {
-        print(k, smc.read(k).map { String(format: "%.1f", $0) } ?? "-")
+    for k in cpuKeys + gpuKeys + ["TC1C", "TC2C", "TC3C", "TC4C", "FNum", "FS! ", "Ftst"]
+        + (0..<2).flatMap({ i in ["Ac", "Mn", "Mx", "Tg", "Md"].map { "F\(i)\($0)" } }) {
+        print(k, smc.info(k).map { "[\($0.type)]" } ?? "", smc.read(k).map { String(format: "%.1f", $0) } ?? "-")
     }
     let u = UsageSampler(); _ = u.cpu(); sleep(1)
     print("CPU usage", pct(u.cpu()), "RAM", pct(u.ram()))

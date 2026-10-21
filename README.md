@@ -2,6 +2,10 @@
 
 แอปเล็ก ๆ สำหรับ macOS ที่บอกอุณหภูมิเครื่องบน **แถบเมนูด้านบน** และบน **Touch Bar**
 
+<p align="center"><img src="docs/menu.gif" width="340" alt="เมนู TempBar: อุณหภูมิ การใช้งาน และกราฟย้อนหลัง"></p>
+
+<p align="center"><img src="docs/touchbar.gif" alt="TempBar บน Touch Bar: แตะเพื่อดูรายละเอียด"></p>
+
 - อุณหภูมิ CPU / GPU และรอบพัดลม (อ่านตรงจาก SMC)
 - การใช้งาน CPU และ RAM เป็น %
 - กราฟย้อนหลัง 10 นาทีในเมนู
@@ -46,3 +50,5 @@ git clone https://github.com/Atomphat/tempbar.git && cd tempbar
 ```
 
 ออก release ใหม่ (build แบบ universal แล้วอัปขึ้น GitHub Releases): `./make-release.sh 1.1.0`
+
+อัดภาพ/GIF สำหรับ README: ดู `tools/demo.swift`
