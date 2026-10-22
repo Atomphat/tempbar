@@ -322,7 +322,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
                      gpu: NSTouchBarItem.Identifier("com.atom.tempbar.gpu"),
                      fan: NSTouchBarItem.Identifier("com.atom.tempbar.fan"),
                      usage: NSTouchBarItem.Identifier("com.atom.tempbar.usage"),
-                     alarm: NSTouchBarItem.Identifier("com.atom.tempbar.alarm"))
+                     alarm: NSTouchBarItem.Identifier("com.atom.tempbar.alarm"),
+                     claude: NSTouchBarItem.Identifier("com.atom.tempbar.claude"))
 
     var smc: SMC!
     let usage = UsageSampler()
@@ -338,6 +339,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
     let cpuLabel = NSTextField(labelWithString: "CPU --")
     let gpuLabel = NSTextField(labelWithString: "GPU --")
     let fanLabel = NSTextField(labelWithString: "Fan --")
+    let claudeButton = NSButton(title: "", target: nil, action: nil)
     var detailBar: NSTouchBar!
     let menuCPU = NSMenuItem(), menuGPU = NSMenuItem(), menuFan = NSMenuItem()
 
@@ -405,11 +407,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
 
         detailBar = NSTouchBar()
         detailBar.delegate = self
-        detailBar.defaultItemIdentifiers = [detailIDs.cpu, .fixedSpaceLarge, detailIDs.gpu, .fixedSpaceLarge,
-                                            detailIDs.usage, .fixedSpaceLarge, detailIDs.fan, .flexibleSpace, detailIDs.alarm]
+        detailBar.defaultItemIdentifiers = [detailIDs.cpu, .fixedSpaceSmall, detailIDs.gpu, .fixedSpaceSmall,
+                                            detailIDs.usage, .fixedSpaceSmall, detailIDs.fan, .flexibleSpace, detailIDs.claude, detailIDs.alarm]
         for l in [cpuLabel, gpuLabel, fanLabel, usageLabel] { l.font = .monospacedDigitSystemFont(ofSize: 15, weight: .semibold) }
         alarmButton.target = self
         alarmButton.action = #selector(toggleAlarm)
+        claudeButton.target = self
+        claudeButton.action = #selector(refreshClaude)
+        claudeButton.isHidden = true
+        claudeButton.imagePosition = .imageLeft
+        claudeButton.image = claudeLogo()
         updateAlarmUI()
     }
 
@@ -426,7 +433,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         menuAlarm.state = alarm.enabled ? .on : .off
         menuThreshold.title = "ตั้งอุณหภูมิเตือน: \(t)°C"
         menuThreshold.submenu?.items.forEach { $0.state = $0.tag == t ? .on : .off }
-        alarmButton.title = alarm.enabled ? "🔔 เตือน \(t)°" : "🔕 ปิดเสียง"
+        alarmButton.title = alarm.enabled ? "🔔 \(t)°" : "🔕"
     }
 
     @objc func pickThreshold(_ sender: NSMenuItem) {
@@ -442,9 +449,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         case detailIDs.fan: item.view = fanLabel
         case detailIDs.usage: item.view = usageLabel
         case detailIDs.alarm: item.view = alarmButton
+        case detailIDs.claude: item.view = claudeButton
         default: return nil
         }
         return item
+    }
+
+    // แตะปุ่ม Claude บน Touch Bar → สั่ง ClaudeBar ดึงข้อมูลใหม่
+    @objc func refreshClaude() {
+        DistributedNotificationCenter.default().postNotificationName(.init("com.atom.claudebar.refresh"),
+                                                                     object: nil, deliverImmediately: true)
     }
 
     @objc func showDetail() {
@@ -485,6 +499,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate {
         cpuLabel.stringValue = "CPU \(fmt(r.cpu))C"; cpuLabel.textColor = color(for: r.cpu)
         gpuLabel.stringValue = "GPU \(fmt(r.gpu))C"; gpuLabel.textColor = color(for: r.gpu)
         fanLabel.stringValue = "🌀 \(fanText)"
+        updateClaude()
+    }
+
+    // โลโก้ Claude จาก ClaudeBar.app (ระบายสีส้มของ Claude) — ไม่มีก็ใช้ ✳︎ ในข้อความแทน
+    func claudeLogo() -> NSImage? {
+        let path = NSHomeDirectory() + "/Applications/ClaudeBar.app/Contents/Resources/claude.png"
+        guard let src = NSImage(contentsOfFile: path) else { return nil }
+        return NSImage(size: NSSize(width: 18, height: 18), flipped: false) { r in
+            src.draw(in: r)
+            NSColor(srgbRed: 0.851, green: 0.467, blue: 0.341, alpha: 1).set()
+            r.fill(using: .sourceAtop)
+            return true
+        }
+    }
+
+    // usage ของ Claude จาก ClaudeBar (~/claude-bar) ถ้าติดตั้งไว้ — ไม่มีไฟล์หรือเก่าเกิน 30 นาทีจะซ่อน
+    func updateClaude() {
+        let path = NSHomeDirectory() + "/Library/Application Support/ClaudeBar/usage.json"
+        guard let data = FileManager.default.contents(atPath: path),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let updated = json["updated"] as? Double, Date().timeIntervalSince1970 - updated < 1800,
+              let limits = json["limits"] as? [[String: Any]],
+              let session = limits.first(where: { $0["kind"] as? String == "session" }) ?? limits.first
+        else { claudeButton.isHidden = true; return }
+        let pct = session["percent"] as? Double ?? 0
+        let left = max(0, Int((session["resets_at"] as? Double ?? 0) - Date().timeIntervalSince1970))
+        var text = (claudeButton.image == nil ? "✳︎" : "") + "\(Int(pct))% ⏱\(left / 3600):" + String(format: "%02d", left % 3600 / 60)
+        if let w = limits.first(where: { $0["kind"] as? String == "weekly_all" }) {
+            text += " 7ว\(Int(w["percent"] as? Double ?? 0))%"
+        }
+        claudeButton.attributedTitle = NSAttributedString(string: text, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .semibold),
+            .foregroundColor: pct >= 90 ? NSColor.systemRed : pct >= 70 ? NSColor.systemOrange : NSColor.white,
+        ])
+        claudeButton.isHidden = false
     }
 }
 
